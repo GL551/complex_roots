@@ -16,6 +16,20 @@ def unique_within_tol(a, tol=1e-12):
     d = np.append(True, np.diff(b))
     return b[d > tol]
 
+def unique_within_tol_complex(a, tol=1e-12):
+    """Brute force finding unique complex values"""
+    if a.size == 0:
+        return a
+
+    sel = np.ones(len(a), dtype=bool)
+
+    for i in range(0, len(a)-1):
+        dist = np.abs(a[i+1:] - a[i]).tolist()
+        if np.min(dist) < tol:
+            sel[i] = False
+
+    return a[sel]
+
 def guess_domain_size(x):
     '''Determines guess_roots zoom-in domain size.
     May be used from other modules.'''
@@ -65,13 +79,18 @@ class RootFinderRectangle():
                                         tol=tol,
                                         clean_tol=clean_tol)
 
-    def calculate(self, func, guess_roots=[]):
+    def calculate(self, func, guess_roots=[], seed=0, number_roots=1):
         """Find roots inside domain.
 
         Args:
             func: function of a complex variable
             guess_roots (optional): list of potential roots
+            seed (optional): seed of random number generator
+            number_roots (optional): expected number of roots
         """
+
+        np.random.seed(seed)
+
         # Calculate sample points and sample function values
         self.z_sample = self.domain.generate_random_sample_points(self.n_sample)
         self.n_function_call = self.n_sample
@@ -209,10 +228,10 @@ class RootFinderRectangle():
             sel = np.asarray(np.imag(ret) > 0.0).nonzero()
 
             # Quit if a growing root found or no more zoom levels or sites
-            if (len(ret[sel]) > 0 or
+            if (len(ret[sel]) >= number_roots or
                 n == self.max_zoom_level or
                 len(zoom_roots) == 0):
-                return ret
+                return unique_within_tol_complex(ret, tol=1.0e-6)
 
             # Not root found: add zoom domains
             for zoom_centre in zoom_roots:
@@ -224,7 +243,7 @@ class RootFinderRectangle():
                                       extra_domain_size=sz,
                                       centre=zoom_centre)
 
-        return ret
+        return unique_within_tol_complex(ret, tol=1.0e-6)
 
     def log_print(self, arg):
         """Only print info if verbose_flag is True"""
